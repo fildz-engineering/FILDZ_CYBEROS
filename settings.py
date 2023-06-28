@@ -99,7 +99,7 @@ class Settings:
                                 cyberos.cyberwares['subscribed'][cyberware].update({'mac': mac, 'events': {}})
                             break
                     except ValueError:
-                        print('CYBEROS > Error loading cyberwares')
+                        # print('CYBEROS > Error loading cyberwares')
                         cyberos.cyberwares['subscribed'] = {}
                         break
                 else:

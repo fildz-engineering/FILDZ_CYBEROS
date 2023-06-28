@@ -201,10 +201,10 @@ class Network:
     #
     async def connect(self, ssid=None, key=None):
         if ssid is None and self._ssid is not None:
-            print('CYBEROS > Reconnecting to', self._ssid)
+            # print('CYBEROS > Reconnecting to', self._ssid)
             network.WLAN(network.STA_IF).connect()
         elif ssid is not None and key is not None:
-            print('CYBEROS > Connecting to', ssid)
+            # print('CYBEROS > Connecting to', ssid)
             network.WLAN(network.STA_IF).connect(ssid, key)
         else:
             return
@@ -236,10 +236,10 @@ class Network:
             if not cyberos.settings.on_save_settings.is_set():
                 cyberos.settings.on_save_settings.set()
 
-        print('CYBEROS > Connected to {} on channel {}'.format(self._ssid, self._sta_ch))
+        # print('CYBEROS > Connected to {} on channel {}'.format(self._ssid, self._sta_ch))
 
     async def disconnect(self):
-        print('CYBEROS > Disconnecting from', self._ssid)
+        # print('CYBEROS > Disconnecting from', self._ssid)
         self._on_sta_connected.clear()
         self._on_sta_disconnected.set()
 
@@ -257,7 +257,7 @@ class Network:
             self._on_sta_up.clear()
             if not self._on_sta_active.is_set():
                 self._on_sta_active.set()
-            print('CYBEROS > STA up')
+            # print('CYBEROS > STA up')
 
     async def _event_sta_down(self):
         while True:
@@ -266,7 +266,7 @@ class Network:
             self._sta_active = False
             self._on_sta_down.clear()
             self._on_sta_active.clear()
-            print('CYBEROS > STA down')
+            # print('CYBEROS > STA down')
 
     async def _event_sta_disconnect(self):
         while True:
@@ -284,7 +284,7 @@ class Network:
                     self._on_ap_up.set()
                     self._on_ap_down.set()
 
-            print('CYBEROS > Disconnected from', self._ssid)
+            # print('CYBEROS > Disconnected from', self._ssid)
 
     async def _event_ap_activate(self):
         while True:
@@ -322,7 +322,7 @@ class Network:
             self._on_ap_up.clear()
             if not self._on_ap_active.is_set():
                 self._on_ap_active.set()
-            print('CYBEROS > AP up')
+            # print('CYBEROS > AP up')
 
     async def _event_ap_down(self):
         while True:
@@ -331,7 +331,7 @@ class Network:
             self._ap_active = False
             self._on_ap_down.clear()
             self._on_ap_active.clear()
-            print('CYBEROS > AP down')
+            # print('CYBEROS > AP down')
 
     async def _event_ap_pixel(self):
         while True:
