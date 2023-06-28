@@ -46,11 +46,11 @@ class Heartbeat:
         while True:
             await self._on_ping.wait()
             self._on_ping.clear()
-            print('Ping from', cyberos.event.sender)
+            # print('Ping from', cyberos.event.sender)
 
     # Received a pong.
     async def _event_pong(self):
         while True:
             await self._on_pong.wait()
             self._on_pong.clear()
-            print('Pong from', cyberos.event.sender)
+            # print('Pong from', cyberos.event.sender)
