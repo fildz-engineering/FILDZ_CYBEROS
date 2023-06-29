@@ -51,7 +51,7 @@ async def init():
     espnow.active(True)
 
     # Notify the user that the cyberos is ready.
-    await cyberware.pixel.set_color(cyberware.pixel.C_GREEN)
+    await cyberware.pixel.set_color(color=cyberware.pixel.C_GREEN)
     await asyncio.sleep(0)  # Fix for first tones play far too long.
     await cyberware.buzzer.play(index=0)
 
