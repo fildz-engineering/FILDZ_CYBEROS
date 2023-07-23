@@ -6,9 +6,6 @@
 #
 # ESP-NOW event listener and firing of events or generators.
 
-# TODO:
-#  1. Optimize _event(), encode() and decode() with bytearray() + memoryview() + struct.unpack_into().
-
 import uasyncio as asyncio
 from uasyncio import Event
 import fildz_cyberos as cyberos
@@ -62,31 +59,14 @@ class Listener:
     async def _event(self):
         async for sender, event in cyberos.espnow:
             self._sender_mac = sender
+            try:
+                self._sender, self._receiver, self._name, self._args = self.decode(event)
+            except:
+                continue
 
-            arg_size = struct.unpack('!HB', event[0:3])[0]
-            arg = struct.unpack('%ds' % arg_size, event[2:2 + arg_size])
-            self._sender = arg[0].decode()
             # print('\nFROM:', self._sender)
-            event = event[2 + arg_size:]
-
-            arg_size = struct.unpack('!HB', event[0:3])[0]
-            arg = struct.unpack('%ds' % arg_size, event[2:2 + arg_size])
-            self._receiver = arg[0].decode()
             # print('TO:', self._receiver)
-            event = event[2 + arg_size:]
-
-            arg_size = struct.unpack('!HB', event[0:3])[0]
-            arg = struct.unpack('%ds' % arg_size, event[2:2 + arg_size])
-            self._name = arg[0].decode()
             # print('EVENT:', self._name)
-            event = event[2 + arg_size:]
-
-            self._args.clear()
-            while len(event) > 0:
-                arg_size = struct.unpack('!HB', event[0:3])[0]
-                arg = struct.unpack('%ds' % arg_size, event[2:2 + arg_size])
-                self._args.append(arg[0])
-                event = event[2 + arg_size:]
             # print('ARGS:', self._args)
 
             self._on_event.set()  # We have a new event, inform tasks.
@@ -144,21 +124,51 @@ class Listener:
             self._on_event.clear()
 
     async def encode(self, event_name, args, cyberware=''):
-        f_len = len(cyberos.cyberware.ap_name)
-        t_len = len(cyberware)
+        a_len = len(cyberos.cyberware.ap_name)
+        c_len = len(cyberware)
         e_len = len(event_name)
 
-        b = struct.pack('!H%ds' % f_len, f_len, cyberos.cyberware.ap_name.encode('utf-8'))
-        b += struct.pack('!H%ds' % t_len, t_len, cyberware.encode('utf-8'))
-        b += struct.pack('!H%ds' % e_len, e_len, event_name.encode('utf-8'))
-
+        n = len(args)
+        for arg in args:
+            n += len(arg)
+        offset = 1 + a_len + 1 + c_len + 1 + e_len
+        n += offset
+        data = bytearray(n)
+        buffer = memoryview(data)
+        struct.pack_into('b%isb%isb%is' % (a_len, c_len, e_len), buffer, 0,
+                         a_len, cyberos.cyberware.ap_name,
+                         c_len, cyberware,
+                         e_len, event_name)
         for arg in args:
             arg_len = len(arg)
-            b += struct.pack('!H%ds' % arg_len, arg_len, arg)
-        return b
+            struct.pack_into('b%is' % arg_len, buffer, offset, arg_len, arg)
+            offset += 1 + arg_len
+        return buffer
 
-    async def decode(self):
-        pass
+    async def decode(self, event):
+        size = len(event)
+        event = memoryview(event)
+        offset = 0
+        args = list()
+
+        # Event sender, receiver, name.
+        for x in range(3):
+            arg_size = event[offset:offset + 1][0]
+            arg = event[offset + 1:offset + 1 + arg_size]
+            arg = str(arg, 'utf8')
+            offset += 1 + len(arg)
+            yield arg
+
+        # Event args.
+        while True:
+            arg_size = event[offset:offset + 1][0]
+            arg = event[offset + 1:offset + 1 + arg_size]
+            arg = str(arg, 'utf8')
+            offset += 1 + len(arg)
+            args.append(arg)
+            if offset >= size:
+                yield args
+                break
 
     async def send(self, event_name, *args, cyberware='', sync=True):
         if cyberware is '':
