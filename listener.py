@@ -59,6 +59,7 @@ class Listener:
     async def _event(self):
         async for sender, event in cyberos.espnow:
             self._sender_mac = sender
+
             try:
                 self._sender, self._receiver, self._name, self._args = self.decode(event)
             except:
@@ -72,7 +73,7 @@ class Listener:
             self._on_event.set()  # We have a new event, inform tasks.
 
             # To whom event was sent?
-            if self._receiver is '':
+            if not len(self._receiver):
                 # Event was sent to all cyberwares, so it is a public event.
                 # Public events are sent to AP MAC address on default channel.
                 if self._name in cyberos.cyberwares[cyberos.cyberware.ap_name]['events']:
@@ -155,7 +156,10 @@ class Listener:
         for x in range(3):
             arg_size = event[offset:offset + 1][0]
             arg = event[offset + 1:offset + 1 + arg_size]
-            arg = str(arg, 'utf8')
+            try:
+                arg = str(arg, 'utf8')
+            except UnicodeError:
+                arg = bytes(arg)
             offset += 1 + len(arg)
             yield arg
 
@@ -163,9 +167,12 @@ class Listener:
         while True:
             arg_size = event[offset:offset + 1][0]
             arg = event[offset + 1:offset + 1 + arg_size]
-            arg = str(arg, 'utf8')
-            offset += 1 + len(arg)
+            try:
+                arg = str(arg, 'utf8')
+            except UnicodeError:
+                arg = bytes(arg)
             args.append(arg)
+            offset += 1 + len(arg)
             if offset >= size:
                 yield args
                 break
