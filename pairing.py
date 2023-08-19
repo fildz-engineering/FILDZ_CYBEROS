@@ -73,7 +73,7 @@ class Pairing:
                     await cyberos.network.disconnect()
                 else:
                     _sta_reconnect = False
-                if cyberos.network.ap_active:
+                if cyberos.network.on_ap_active.is_set():
                     _ap_disable = False
                 else:
                     _ap_disable = True
