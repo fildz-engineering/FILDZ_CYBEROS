@@ -34,7 +34,6 @@ class Network:
         asyncio.create_task(self._event_sta_down())
         self._on_sta_connected = Event()
         self._on_sta_disconnected = Event()
-        asyncio.create_task(self._event_sta_disconnect())
 
         self._sta_ch = cyberos.preferences['sta_channel']
         self._ap_ch = cyberos.preferences['ap_channel']
@@ -60,9 +59,12 @@ class Network:
             self._on_ap_up.set()  # To update the STA and AP channel.
             self._on_ap_down.set()
 
+        # Various tasks that depend on this class.
         asyncio.create_task(self._event_ap_activate())
         self._on_ap_pixel = Event()
         asyncio.create_task(self._event_ap_pixel())
+        self._on_wlan_change = Event()
+        # asyncio.create_task(self._event_wlan_change())
 
     ################################################################################
     # Properties
@@ -212,7 +214,9 @@ class Network:
         # Fix this because this can take forever?
         while not network.WLAN(network.STA_IF).isconnected():
             await asyncio.sleep(0)
+        self._on_sta_disconnected.clear()
         self._on_sta_connected.set()
+        self._on_wlan_change.set()
 
         # Disable the power-saving mode on the STA_IF interface for reliable ESP-NOW communication.
         network.WLAN(network.STA_IF).config(pm=network.WLAN.PM_NONE)
@@ -239,9 +243,22 @@ class Network:
         # print('CYBEROS > Connected to {} on channel {}'.format(self._ssid, self._sta_ch))
 
     async def disconnect(self):
-        # print('CYBEROS > Disconnecting from', self._ssid)
+        network.WLAN(network.STA_IF).disconnect()
+        while network.WLAN(network.STA_IF).isconnected():
+            await asyncio.sleep(0)
         self._on_sta_connected.clear()
         self._on_sta_disconnected.set()
+
+        network.WLAN(network.STA_IF).config(pm=network.WLAN.PM_PERFORMANCE)
+
+        if self._ch_reset:
+            if self._on_ap_active.is_set():
+                self._on_ap_up.set()
+            else:
+                self._on_ap_up.set()
+                self._on_ap_down.set()
+        self._on_wlan_change.set()
+        # print('CYBEROS > Disconnected from', self._ssid)
 
     async def _event_sta_up(self):
         while True:
@@ -251,8 +268,8 @@ class Network:
             network.WLAN(network.STA_IF).config(reconnects=cyberos.preferences['sta_reconnects'])
             network.WLAN(network.STA_IF).config(pm=network.WLAN.PM_PERFORMANCE)
             self._on_sta_up.clear()
-            if not self._on_sta_active.is_set():
-                self._on_sta_active.set()
+            self._on_sta_active.set()
+            self._on_wlan_change.set()
             # print('CYBEROS > STA up')
 
     async def _event_sta_down(self):
@@ -261,24 +278,8 @@ class Network:
             network.WLAN(network.STA_IF).active(False)
             self._on_sta_down.clear()
             self._on_sta_active.clear()
+            self._on_wlan_change.set()
             # print('CYBEROS > STA down')
-
-    async def _event_sta_disconnect(self):
-        while True:
-            await self._on_sta_disconnected.wait()
-            network.WLAN(network.STA_IF).disconnect()
-            while network.WLAN(network.STA_IF).isconnected():
-                await asyncio.sleep(0)
-            network.WLAN(network.STA_IF).config(pm=network.WLAN.PM_PERFORMANCE)
-            self._on_sta_disconnected.clear()
-
-            if self._ch_reset:
-                if not self._on_ap_active.is_set():
-                    self._on_ap_up.set()
-                else:
-                    self._on_ap_up.set()
-                    self._on_ap_down.set()
-            # print('CYBEROS > Disconnected from', self._ssid)
 
     async def _event_ap_up(self):
         while True:
@@ -289,8 +290,8 @@ class Network:
                                                channel=self._ap_ch)
 
             self._on_ap_up.clear()
-            if not self._on_ap_active.is_set():
-                self._on_ap_active.set()
+            self._on_ap_active.set()
+            self._on_wlan_change.set()
             # print('CYBEROS > AP up')
 
     async def _event_ap_down(self):
@@ -299,11 +300,16 @@ class Network:
             network.WLAN(network.AP_IF).active(False)
             self._on_ap_down.clear()
             self._on_ap_active.clear()
+            self._on_wlan_change.set()
             # print('CYBEROS > AP down')
 
     async def _event_ch_change(self):
         pass
 
+    ################################################################################
+    # Handlers
+    #
+    # Enable AP on double click and hold.
     async def _event_ap_activate(self):
         while True:
             await cyberos.cyberware.power_button.on_double_click.wait()
@@ -328,6 +334,7 @@ class Network:
                 if cyberos.cyberware.power_button.on_hold.is_set():
                     await cyberos.cyberware.power_button.on_up.wait()
 
+    # Enable built-in LED RGB to show color code once AP is enabled via power button.
     async def _event_ap_pixel(self):
         while True:
             await self._on_ap_pixel.wait()
@@ -347,3 +354,18 @@ class Network:
                 await cyberos.cyberware.pixel.set_color(color=cyberos.cyberware.pixel.C_BLANK)
                 await asyncio.sleep(1)
                 await cyberos.cyberware.pixel.set_color(color=cyberos.cyberware.pixel.C_GREEN)
+
+    # Enable or disable HTTP server depending on network interfaces states.
+    async def _event_wlan_change(self):
+        while True:
+            await self._on_wlan_change.wait()
+            if self._on_sta_connected.is_set() or self._on_ap_active.is_set():
+                await cyberos.server.start()
+                self._on_wlan_change.clear()
+                # print('CYBEROS > HTTP server started')
+            elif self._on_sta_disconnected.is_set() and not self._on_ap_active.is_set():
+                await cyberos.server.stop()
+                self._on_wlan_change.clear()
+                # print('CYBEROS > HTTP server stopped')
+            else:
+                self._on_wlan_change.clear()
