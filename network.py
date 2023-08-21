@@ -10,7 +10,6 @@
 #  1. Cyberware channel management 'on_ch_change', 'ch_update' etc.
 #  2. Fix connect() to stop connecting to Wi-Fi AP forever.
 #  3. Check connect() with open Wi-Fi AP.
-#  4. OSError: can't set AP config (_event_ap_up). See: https://github.com/micropython/micropython/issues/12262).
 
 import uasyncio as asyncio
 from uasyncio import Event
@@ -28,10 +27,10 @@ class Network:
 
         self._on_sta_up = Event()
         asyncio.create_task(self._event_sta_up())
-        self._on_sta_active = Event()
-        self._on_sta_up.set()  # STA interface is always active and should not be disabled.
         self._on_sta_down = Event()
         asyncio.create_task(self._event_sta_down())
+        self._on_sta_up.set()  # STA interface is always active and should not be disabled.
+        self._on_sta_active = Event()
         self._on_sta_connected = Event()
         self._on_sta_disconnected = Event()
 
@@ -48,9 +47,9 @@ class Network:
 
         self._on_ap_up = Event()
         asyncio.create_task(self._event_ap_up())
-        self._on_ap_active = Event()
         self._on_ap_down = Event()
         asyncio.create_task(self._event_ap_down())
+        self._on_ap_active = Event()
 
         self._ap_boot = cyberos.preferences['ap_boot']
         if self._ap_boot:
@@ -64,7 +63,7 @@ class Network:
         self._on_ap_pixel = Event()
         asyncio.create_task(self._event_ap_pixel())
         self._on_wlan_change = Event()
-        # asyncio.create_task(self._event_wlan_change())
+        asyncio.create_task(self._event_wlan_change())
 
     ################################################################################
     # Properties
@@ -240,7 +239,7 @@ class Network:
             if not cyberos.settings.on_save_settings.is_set():
                 cyberos.settings.on_save_settings.set()
 
-        # print('CYBEROS > Connected to {} on channel {}'.format(self._ssid, self._sta_ch))
+        print('CYBEROS > Connected to {} on channel {}'.format(self._ssid, self._sta_ch))
 
     async def disconnect(self):
         network.WLAN(network.STA_IF).disconnect()
@@ -258,19 +257,21 @@ class Network:
                 self._on_ap_up.set()
                 self._on_ap_down.set()
         self._on_wlan_change.set()
-        # print('CYBEROS > Disconnected from', self._ssid)
+        print('CYBEROS > Disconnected from', self._ssid)
 
     async def _event_sta_up(self):
         while True:
             await self._on_sta_up.wait()
             network.WLAN(network.STA_IF).active(True)
+            while not network.WLAN(network.STA_IF).active():
+                await asyncio.sleep(0)
             network.WLAN(network.STA_IF).config(auto_connect=cyberos.preferences['sta_reconnect'])
             network.WLAN(network.STA_IF).config(reconnects=cyberos.preferences['sta_reconnects'])
             network.WLAN(network.STA_IF).config(pm=network.WLAN.PM_PERFORMANCE)
             self._on_sta_up.clear()
             self._on_sta_active.set()
             self._on_wlan_change.set()
-            # print('CYBEROS > STA up')
+            print('CYBEROS > STA up')
 
     async def _event_sta_down(self):
         while True:
@@ -279,12 +280,14 @@ class Network:
             self._on_sta_down.clear()
             self._on_sta_active.clear()
             self._on_wlan_change.set()
-            # print('CYBEROS > STA down')
+            print('CYBEROS > STA down')
 
     async def _event_ap_up(self):
         while True:
             await self._on_ap_up.wait()
             network.WLAN(network.AP_IF).active(True)
+            while not network.WLAN(network.AP_IF).active():
+                await asyncio.sleep(0)
             network.WLAN(network.AP_IF).config(ssid=cyberos.cyberware.ap_name,
                                                mac=cyberos.cyberware.mac_public,
                                                channel=self._ap_ch)
@@ -292,7 +295,7 @@ class Network:
             self._on_ap_up.clear()
             self._on_ap_active.set()
             self._on_wlan_change.set()
-            # print('CYBEROS > AP up')
+            print('CYBEROS > AP up')
 
     async def _event_ap_down(self):
         while True:
@@ -301,14 +304,11 @@ class Network:
             self._on_ap_down.clear()
             self._on_ap_active.clear()
             self._on_wlan_change.set()
-            # print('CYBEROS > AP down')
+            print('CYBEROS > AP down')
 
     async def _event_ch_change(self):
         pass
 
-    ################################################################################
-    # Handlers
-    #
     # Enable AP on double click and hold.
     async def _event_ap_activate(self):
         while True:
