@@ -1,0 +1,228 @@
+# The MIT License (MIT)
+# Copyright (c) 2023 Edgaras Janušauskas and Inovatorius MB (www.fildz.com)
+# Copyright (c) 2020 Charles R.
+
+################################################################################
+# FILDZ CYBEROS HTTP SERVER
+#
+# Fully asynchronous HTTP server for CYBEROS.
+
+import uasyncio as asyncio
+import uerrno
+from ubinascii import a2b_base64 as base64_decode
+
+
+class HttpError(Exception):
+    pass
+
+
+class Request:
+    def __init__(self):
+        self.url = ''
+        self.method = ''
+        self.headers = {}
+        self.route = ''
+        self.read = None
+        self.write = None
+        self.close = None
+
+
+class HTTPServer:
+    extract_headers = ('Authorization', 'Content-Length', 'Content-Type')
+    headers = {}
+    routes = {}
+    assets_extensions = ('html', 'css', 'js')
+    callback_request = None
+    STATIC_DIR = './'
+    INDEX_FILE = STATIC_DIR + 'index.html'
+
+    def __init__(self, port=80, address='0.0.0.0'):
+        self.port = port
+        self.address = address
+        self.instance = None  # Asyncio server object.
+
+    async def write(self, request, data):
+        await request.write(
+            data.encode('ISO-8859-1') if type(data) == str else data
+        )
+
+    async def error(self, request, code, reason):
+        await request.write('HTTP/1.1 %s %s\r\n\r\n' % (code, reason))
+        await request.write('<h1>%s</h1>' % reason)
+
+    def authenticate(self, credentials):
+        async def fail(request):
+            await request.write("HTTP/1.1 401 Unauthorized\r\n")
+            await request.write('WWW-Authenticate: Basic realm="Restricted"\r\n\r\n')
+            await request.write("<h1>Unauthorized</h1>")
+
+        def decorator(func):
+            async def wrapper(request):
+                header = request.headers.get('Authorization', None)
+                if header is None:
+                    return await fail(request)
+
+                # Authorization: Basic XXX
+                kind, authorization = header.strip().split(' ', 1)
+                if kind != "Basic":
+                    return await fail(request)
+
+                authorization = base64_decode(authorization.strip()) \
+                    .decode('ascii') \
+                    .split(':')
+
+                if list(credentials) != list(authorization):
+                    return await fail(request)
+
+                return await func(request)
+
+            return wrapper
+
+        return decorator
+
+    async def send_file(self, request, filename, segment=64, binary=False):
+        try:
+            with open(filename, 'rb' if binary else 'r') as f:
+                while True:
+                    data = f.read(segment)
+                    if not data:
+                        break
+                    await request.write(data)
+        except OSError as e:
+            if e.args[0] != uerrno.ENOENT:
+                raise
+            raise HttpError(request, 404, 'File Not Found')
+
+    def route(self, route):
+        """Route decorator"""
+        def decorator(func):
+            self.routes[route] = func
+            return func
+        return decorator
+
+    async def generate_output(self, request, handler):
+        """Generate output from handler
+
+        `handler` can be :
+         * dict representing the template context
+         * string, considered as a path to a file
+         * tuple where the first item is filename and the second
+           is the template context
+         * callable, the output of which is sent to the client
+        """
+        while True:
+            if isinstance(handler, dict):
+                handler = (request.url, handler)
+
+            if isinstance(handler, str):
+                await self.write(request, 'HTTP/1.1 200 OK\r\n\r\n')
+                await self.send_file(request, handler)
+            elif isinstance(handler, tuple):
+                await self.write(request, 'HTTP/1.1 200 OK\r\n\r\n')
+                filename, context = handler
+                context = context() if callable(context) else context
+                try:
+                    with open(filename, 'r') as f:
+                        for l in f:
+                            await self.write(request, l.format(**context))
+                except OSError as e:
+                    if e.args[0] != uerrno.ENOENT:
+                        raise
+                    raise HttpError(request, 404, 'File Not Found')
+            else:
+                handler = await handler(request)
+                if handler:
+                    # handler can return data that can be fed back
+                    # to the input of the function
+                    continue
+            break
+
+    async def handle(self, reader, writer):
+        items = await reader.readline()
+        items = items.decode('ascii').split()
+        if len(items) != 3:
+            return
+
+        request = Request()
+        request.read = reader.read
+        request.write = writer.awrite
+        request.close = writer.aclose
+
+        request.method, request.url, version = items
+
+        try:
+            try:
+                if version not in ('HTTP/1.0', 'HTTP/1.1'):
+                    raise HttpError(request, 505, 'Version Not Supported')
+
+                while True:
+                    items = await reader.readline()
+                    items = items.decode('ascii').split(':', 1)
+
+                    if len(items) == 2:
+                        header, value = items
+                        value = value.strip()
+
+                        if header in self.extract_headers:
+                            request.headers[header] = value
+                    elif len(items) == 1:
+                        break
+
+                if self.callback_request:
+                    self.callback_request(request)
+
+                if request.url in self.routes:
+                    # 1. If current url exists in routes
+                    request.route = request.url
+                    await self.generate_output(request,
+                                               self.routes[request.url])
+                else:
+                    # 2. Search url in routes with wildcard
+                    for route, handler in self.routes.items():
+                        if route == request.url \
+                                or (route[-1] == '*' and
+                                    request.url.startswith(route[:-1])):
+                            request.route = route
+                            await self.generate_output(request, handler)
+                            break
+                    else:
+                        # 3. Try to load index file
+                        if request.url in ('', '/'):
+                            await self.send_file(request, self.INDEX_FILE)
+                        else:
+                            # 4. Current url have an assets extension?
+                            for extension in self.assets_extensions:
+                                if request.url.endswith('.' + extension):
+                                    await self.send_file(
+                                        request,
+                                        '%s/%s' % (
+                                            self.STATIC_DIR,
+                                            request.url,
+                                        ),
+                                        binary=True,
+                                    )
+                                    break
+                            else:
+                                raise HttpError(request, 404, 'File Not Found')
+            except HttpError as e:
+                request, code, message = e.args
+                await self.error(request, code, message)
+        except OSError as e:
+            # Skip ECONNRESET error (client abort request)
+            if e.args[0] != uerrno.ECONNRESET:
+                raise
+        finally:
+            await writer.aclose()
+
+    async def _run(self):
+        self.instance = await asyncio.start_server(self.handle, self.address, self.port)
+
+    async def start(self):
+        if self.instance is None:
+            await asyncio.create_task(self._run())
+            # from fildz_console import api
+
+    async def stop(self):
+        if self.instance is not None:
+            self.instance.close()
+            self.instance = None
