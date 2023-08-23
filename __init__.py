@@ -14,6 +14,7 @@ from .listener import Listener as event
 from .pairing import Pairing as pairing
 from .heartbeat import Heartbeat as heartbeat
 import aioespnow as espnow
+from .httpserver import HTTPServer as server
 
 
 async def init():
@@ -23,10 +24,10 @@ async def init():
 
     # Various user preferences stored in a dictionary.
     global preferences
-    preferences = dict(ap_boot=False, ap_name=None, ap_color=None, ap_color_code=None, ap_channel=13,
-                       sta_reconnect=False, sta_reconnects=-1, sta_channel=13,
-                       channel_update=False, channel_reset=True,
-                       ssid=None, key=None)
+    preferences = dict(ap_boot=False, ap_ssid=None, ap_key='inovator', ap_color=None, ap_color_code=None, ap_channel=13,
+                       sta_boot=True, sta_reconnect=False, sta_reconnects=-1, sta_channel=13,
+                       sta_ssid=None, sta_key=None,
+                       channel_update=False, channel_reset=True,)
 
     global settings
     settings = settings()
@@ -49,6 +50,9 @@ async def init():
     global espnow
     espnow = espnow.AIOESPNow()
     espnow.active(True)
+
+    global server
+    server = server()
 
     # Notify the user that the cyberos is ready.
     await cyberware.pixel.set_color(color=cyberware.pixel.C_GREEN)
