@@ -18,10 +18,12 @@ import fildz_cyberos as cyberos
 class Heartbeat:
     def __init__(self):
         self._on_ping = Event()
-        asyncio.create_task(self._event_ping())
         self._on_pong = Event()
+
+        asyncio.create_task(self._event_ping())
         asyncio.create_task(self._event_pong())
-        cyberos.cyberwares[cyberos.cyberware.ap_name]['events'].update(
+
+        cyberos.cyberwares[cyberos.network.ap_ssid]['events'].update(
             {
                 'on_ping': self._on_ping,
                 'on_pong': self._on_pong
