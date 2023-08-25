@@ -4,13 +4,7 @@
 ################################################################################
 # FILDZ CYBEROS PAIRING
 #
-# Pairing of two (or more) cyberwares goes like this:
-# 1. enter pairing mode by holding power button for 3 s.;
-# 2. cyberware then disconnects from Wi-Fi AP (if connected);
-# 3. cyberware enables AP interface;
-# 4. cyberware sends pairing request to "public" MAC address for 3 seconds (1 request per second);
-# 5. if no one responds, we stop and wait for the event to repeat this task;
-# 6. if we do receive a response, we save the data and pairing continue paring (if 3 seconds has not passed yet).
+# Pairing mechanism for cyberwares.
 
 # TODO:
 #  1. Pairing mechanism is unreliable due to if one cyberware sends last pairing request while second cyberware sends
@@ -25,12 +19,14 @@ import fildz_cyberos as cyberos
 class Pairing:
     def __init__(self):
         self._on_pair = Event()
-        asyncio.create_task(self._event_pair())
         self._on_pairing = Event()
-        asyncio.create_task(self._event_pairing())
         self._on_paired = Event()
+
+        asyncio.create_task(self._event_pair())
+        asyncio.create_task(self._event_pairing())
         asyncio.create_task(self._event_pairing_mode())
-        cyberos.cyberwares[cyberos.cyberware.ap_name]['events'].update(
+
+        cyberos.cyberwares[cyberos.network.ap_ssid]['events'].update(
             {
                 'on_pairing': self._on_pairing,
             })
@@ -67,7 +63,7 @@ class Pairing:
             try:
                 await asyncio.wait_for(cyberos.cyberware.power_button.on_up.wait(), 3)
             except asyncio.TimeoutError:
-                # print('CYBEROS > Pairing mode started')
+                print('CYBEROS > Pairing mode started')
                 if cyberos.network.on_sta_connected.is_set():
                     _sta_reconnect = True
                     await cyberos.network.disconnect()
@@ -81,7 +77,7 @@ class Pairing:
                 self._on_pair.set()
                 await asyncio.sleep(3)
                 self._on_pair.clear()
-                # print('CYBEROS > Pairing mode timeout')
+                print('CYBEROS > Pairing mode timeout')
                 if _sta_reconnect:
                     await cyberos.network.connect()
                 if _ap_disable:
@@ -98,8 +94,9 @@ class Pairing:
                                                 cyberos.network.ap_ch.to_bytes(1, 'little')))
             # Send pairing request every second.
             while self._on_pair.is_set():
-                # print('CYBEROS > Pairing mode')
+                print('CYBEROS > Pairing mode')
                 await cyberos.espnow.asend(cyberos.cyberware.mac_public, event, sync=True)
+                await cyberos.cyberware.buzzer.play(4)
                 await asyncio.sleep(1)
 
     # Received a new pairing request.
@@ -125,7 +122,7 @@ class Pairing:
                         'mac_str': ubinascii.hexlify(cyberos.event.args[0], ':').decode().upper(),
                         'channel': int.from_bytes(cyberos.event.args[1], 'little'),
                         'events': {}}
-                # print('CYBEROS > Paired with', cyberos.event.sender)
+                print('CYBEROS > Paired with', cyberos.event.sender)
                 self._on_paired.set()
                 cyberos.settings.on_save_cyberwares.set()
                 self._on_pairing.clear()
