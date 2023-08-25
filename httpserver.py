@@ -10,6 +10,7 @@
 import uasyncio as asyncio
 import uerrno
 from ubinascii import a2b_base64 as base64_decode
+import fildz_cyberos as cyberos
 
 
 class HttpError(Exception):
@@ -40,6 +41,7 @@ class HTTPServer:
         self.port = port
         self.address = address
         self.instance = None  # Asyncio server object.
+        asyncio.create_task(self._event_wlan_change())
 
     async def write(self, request, data):
         await request.write(
@@ -220,9 +222,22 @@ class HTTPServer:
     async def start(self):
         if self.instance is None:
             await asyncio.create_task(self._run())
-            # from fildz_console import api
+            from fildz_console import api
+            print('CYBEROS > HTTP server started')
 
     async def stop(self):
         if self.instance is not None:
             self.instance.close()
             self.instance = None
+            print('CYBEROS > HTTP server stopped')
+
+    # Enable or disable HTTP server depending on network interfaces states.
+    async def _event_wlan_change(self):
+        while True:
+            await cyberos.network.on_wlan_change.wait()
+            if not cyberos.pairing.on_pair.is_set():
+                if cyberos.network.on_sta_connected.is_set() or cyberos.network.on_ap_active.is_set():
+                    await self.start()
+                elif not cyberos.network.on_sta_connected.is_set() and not cyberos.network.on_ap_active.is_set():
+                    await self.stop()
+            cyberos.network.on_wlan_change.clear()
