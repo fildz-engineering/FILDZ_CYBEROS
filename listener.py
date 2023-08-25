@@ -16,6 +16,7 @@ class Listener:
     def __init__(self):
         self._on_event = Event()
         asyncio.create_task(self._event())
+
         self._sender_mac = None  # Event sender MAC address (e.g., b'\x9e\x9c\x1f\x00\x00\x00')
         self._name = None  # Event name (e.g., on_pair, on_ping)
         self._args = list()  # Event arguments (e.g., (0, 0, 'Hello World!'))
@@ -76,11 +77,11 @@ class Listener:
             if not len(self._receiver):
                 # Event was sent to all cyberwares, so it is a public event.
                 # Public events are sent to AP MAC address on default channel.
-                if self._name in cyberos.cyberwares[cyberos.cyberware.ap_name]['events']:
-                    if not cyberos.cyberwares[cyberos.cyberware.ap_name]['events'][self._name].is_set():
+                if self._name in cyberos.cyberwares[cyberos.network.ap_ssid]['events']:
+                    if not cyberos.cyberwares[cyberos.network.ap_ssid]['events'][self._name].is_set():
                         # print('\nPUBLIC {} EVENT'.format(self._name))
-                        cyberos.cyberwares[cyberos.cyberware.ap_name]['events'][self._name].set()
-            elif self._receiver == cyberos.cyberware.ap_name:
+                        cyberos.cyberwares[cyberos.network.ap_ssid]['events'][self._name].set()
+            elif self._receiver == cyberos.network.ap_ssid:
                 # Event was sent to our cyberware, so it is a private event.
                 # Private events are sent to STA MAC address on random channel (channel depends on cyberware config).
                 # The event we received can be from unpaired, in-pairing, or paired cyberware.
@@ -113,10 +114,10 @@ class Listener:
                     # We do not execute any events from 'unpaired' cyberware except if it is a public event
                     # like 'on_pairing' that is only available in 'in-pairing' cyberware.
                     # 'in-pairing' cyberware is a cyberware that is answering our pairing (on_pairing event) request.
-                    if self._name in cyberos.cyberwares[cyberos.cyberware.ap_name]['events']:
-                        if not cyberos.cyberwares[cyberos.cyberware.ap_name]['events'][self._name].is_set():
+                    if self._name in cyberos.cyberwares[cyberos.network.ap_ssid]['events']:
+                        if not cyberos.cyberwares[cyberos.network.ap_ssid]['events'][self._name].is_set():
                             # print('\nCYBEROS {} EVENT'.format(self._name))
-                            cyberos.cyberwares[cyberos.cyberware.ap_name]['events'][self._name].set()
+                            cyberos.cyberwares[cyberos.network.ap_ssid]['events'][self._name].set()
                     # else:
                     # print('\nUNPAIRED {} {} UNSUBSCRIBED EVENT'.format(self._sender, self._name))
             # Event was sent to some other cyberware, resend it to all.
@@ -125,7 +126,7 @@ class Listener:
             self._on_event.clear()
 
     async def encode(self, event_name, args, cyberware=''):
-        a_len = len(cyberos.cyberware.ap_name)
+        a_len = len(cyberos.network.ap_ssid)
         c_len = len(cyberware)
         e_len = len(event_name)
 
@@ -137,7 +138,7 @@ class Listener:
         data = bytearray(n)
         buffer = memoryview(data)
         struct.pack_into('b%isb%isb%is' % (a_len, c_len, e_len), buffer, 0,
-                         a_len, cyberos.cyberware.ap_name,
+                         a_len, cyberos.network.ap_ssid,
                          c_len, cyberware,
                          e_len, event_name)
         for arg in args:
