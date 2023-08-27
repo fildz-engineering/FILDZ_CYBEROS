@@ -12,13 +12,13 @@
 #  3. Check connect() with open Wi-Fi AP, without ssid and key.
 #  4. As "ap_name" used to config the AP, make sure user chosen name is valid to use (length, special characters, etc).
 #  5. If "ap_name" changes, update cyberos.cyberwares dictionary.
-#  6. _event_ap_pixel() will keep the old pixel colors.
-#  7. Test self._sta_if.config(auto_connect=cyberos.preferences['sta_reconnect'])
+#  6. Test self._sta_if.config(auto_connect=cyberos.preferences['sta_reconnect'])
 
 import uasyncio as asyncio
 from uasyncio import Event
 import fildz_cyberos as cyberos
 import network
+from .network_utils import _event_ap_pixel, _event_ap_power_button, _ap_color_code_update
 
 
 class Network:
@@ -60,7 +60,7 @@ class Network:
 
         # We must generate cyberware AP SSID on first start.
         if self._ap_ssid is None:
-            asyncio.create_task(self._event_ap_color_code_update())
+            asyncio.create_task(_ap_color_code_update())
 
         if self._sta_boot:
             self._on_sta_up.set()
@@ -73,16 +73,15 @@ class Network:
             self._on_ap_up.set()  # To update the STA/AP channel.
             self._on_ap_down.set()
 
-        if not self._sta_reconnect:
-            self._on_sta_disconnected.set()
+        self._on_sta_disconnected.set()
 
         asyncio.create_task(self._event_sta_up())
         asyncio.create_task(self._event_sta_down())
         asyncio.create_task(self._event_ap_up())
         asyncio.create_task(self._event_ap_down())
         asyncio.create_task(self._event_ch_change())
-        asyncio.create_task(self._event_ap_activate())
-        asyncio.create_task(self._event_ap_pixel())
+        asyncio.create_task(_event_ap_power_button())
+        asyncio.create_task(_event_ap_pixel())
 
         # Events.
         cyberos.cyberwares[self._ap_ssid] = (
@@ -167,10 +166,22 @@ class Network:
     def ap_color(self):
         return self._ap_color
 
+    @ap_color.setter
+    def ap_color(self, value):
+        self._ap_color = value
+        cyberos.preferences['ap_color'] = value
+        cyberos.settings.on_save_settings.set()
+
     # Cyberware AP color code e.g., "YYG".
     @property
     def ap_color_code(self):
         return self._ap_color_code
+
+    @ap_color_code.setter
+    def ap_color_code(self, value):
+        self._ap_color_code = value
+        cyberos.preferences['ap_color_code'] = value
+        cyberos.settings.on_save_settings.set()
 
     # Enable AP_IF on boot.
     @property
@@ -269,6 +280,10 @@ class Network:
     @property
     def on_wlan_change(self):
         return self._on_wlan_change
+
+    @property
+    def on_ap_pixel(self):
+        return self._on_ap_pixel
 
     ################################################################################
     # Tasks
@@ -374,56 +389,3 @@ class Network:
 
     async def _event_ch_change(self):
         pass
-
-    # Generate AP name and color code.
-    async def _event_ap_color_code_update(self):
-        import random
-        c1 = cyberos.cyberware.pixel.COLORS[random.getrandbits(3)]
-        c2 = cyberos.cyberware.pixel.COLORS[random.getrandbits(3)]
-        c3 = cyberos.cyberware.pixel.COLORS[random.getrandbits(3)]
-        self._ap_color = (c1[1], c2[1], c3[1])
-        cyberos.preferences['ap_color'] = self._ap_color
-        self._ap_color_code = '%s%s%s' % (c1[0], c2[0], c3[0])
-        cyberos.preferences['ap_color_code'] = self._ap_color_code
-        self.ap_ssid = '%s-%s' % (cyberos.cyberware.name, self._ap_color_code) if self._ap_ssid is None else self._ap_ssid
-
-    # Enable AP on double click and hold.
-    async def _event_ap_activate(self):
-        while True:
-            await cyberos.cyberware.power_button.on_double_click.wait()
-            try:
-                await asyncio.wait_for_ms(cyberos.cyberware.power_button.on_down.wait(),
-                                          cyberos.cyberware.power_button._double_click_ms)
-            except asyncio.TimeoutError:
-                continue
-            try:
-                await asyncio.wait_for(cyberos.cyberware.power_button.on_up.wait(), 3)
-            except asyncio.TimeoutError:
-                if self._on_ap_active.is_set():
-                    self._on_ap_down.set()
-                    self._on_ap_pixel.clear()
-                    await asyncio.sleep(0)  # Fix for first tones play far too long.
-                    await cyberos.cyberware.buzzer.play(index=1)
-                else:
-                    self._on_ap_up.set()
-                    self._on_ap_pixel.set()
-                    await asyncio.sleep(0)  # Fix for first tones play far too long.
-                    await cyberos.cyberware.buzzer.play(index=0)
-                if cyberos.cyberware.power_button.on_hold.is_set():
-                    await cyberos.cyberware.power_button.on_up.wait()
-
-    # Enable built-in LED RGB to show color code once AP is enabled via power button.
-    async def _event_ap_pixel(self):
-        pass
-        # while True:
-        #     await self._on_ap_pixel.wait()
-        #     for color in [cyberos.cyberware.pixel.C_BLANK, self._ap_color[0],
-        #                   cyberos.cyberware.pixel.C_BLANK, self._ap_color[1],
-        #                   cyberos.cyberware.pixel.C_BLANK, self._ap_color[2]]:
-        #         await cyberos.cyberware.pixel.set_color(color=color)
-        #         await asyncio.sleep(1)
-        #         if not self._on_ap_pixel.is_set():
-        #             await cyberos.cyberware.pixel.set_color(color=cyberos.cyberware.pixel.C_BLANK)
-        #             await asyncio.sleep(1)
-        #             await cyberos.cyberware.pixel.set_color(color=cyberos.cyberware.pixel.C_GREEN)
-        #             break
