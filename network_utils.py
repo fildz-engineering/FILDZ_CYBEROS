@@ -9,10 +9,9 @@ async def _ap_color_code_update():
     c2 = cyberos.cyberware.pixel.COLORS[random.getrandbits(3)]
     c3 = cyberos.cyberware.pixel.COLORS[random.getrandbits(3)]
     cyberos.network.ap_color = (c1[1], c2[1], c3[1])
-    cyberos.preferences['ap_color'] = cyberos.network.ap_color
     cyberos.network.ap_color_code = '%s%s%s' % (c1[0], c2[0], c3[0])
-    cyberos.preferences['ap_color_code'] = cyberos.network.ap_color_code
-    cyberos.network.ap_ssid = '%s-%s' % (cyberos.cyberware.name, cyberos.network.ap_color_code) if cyberos.network.ap_ssid is None else cyberos.network.ap_ssid
+    if cyberos.network.ap_ssid is None or cyberos.network.ap_ssid[:-4] == cyberos.cyberware.name:
+        cyberos.network.ap_ssid = '%s-%s' % (cyberos.cyberware.name, cyberos.network.ap_color_code)
 
 
 # Enable AP on double click and hold.
