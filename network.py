@@ -8,11 +8,8 @@
 
 # TODO:
 #  1. Cyberware channel management 'on_ch_change', 'ch_update' etc.
-#  2. Fix connect() to stop connecting to Wi-Fi AP forever.
-#  3. Check connect() with open Wi-Fi AP, without ssid and key.
-#  4. As "ap_name" used to config the AP, make sure user chosen name is valid to use (length, special characters, etc).
-#  5. If "ap_name" changes, update cyberos.cyberwares dictionary.
-#  6. Test self._sta_if.config(auto_connect=cyberos.preferences['sta_reconnect'])
+#  2. As "ap_name" used to config the AP, make sure user chosen name is valid to use (length, special characters, etc).
+#  3. If "ap_name" changes, update cyberos.cyberwares dictionary and inform paired cyberwares.
 
 import uasyncio as asyncio
 from uasyncio import Event
@@ -32,6 +29,7 @@ class Network:
         self._sta_reconnect = cyberos.preferences['sta_reconnect']
         self._sta_reconnects = cyberos.preferences['sta_reconnects']
         self._sta_ch = cyberos.preferences['sta_channel']
+        self._sta_hostname = cyberos.preferences['sta_hostname']
 
         self._ap_boot = cyberos.preferences['ap_boot']
         self._ap_ssid = cyberos.preferences['ap_ssid']
@@ -58,9 +56,12 @@ class Network:
 
         self._on_ap_pixel = Event()
 
-        # We must generate cyberware AP SSID on first start.
+        # We must generate cyberware AP SSID and color code on first start.
         if self._ap_ssid is None:
             asyncio.create_task(_ap_color_code_update())
+
+        if self._sta_hostname is None:
+            self.sta_hostname = cyberos.cyberware.name
 
         if self._sta_boot:
             self._on_sta_up.set()
@@ -137,6 +138,16 @@ class Network:
     def sta_reconnects(self, value):
         self._sta_reconnects = value
         cyberos.preferences['sta_reconnects'] = value
+        cyberos.settings.on_save_settings.set()
+
+    @property
+    def sta_hostname(self):
+        return self._sta_hostname
+
+    @sta_hostname.setter
+    def sta_hostname(self, value):
+        self._sta_hostname = '%s-%s' % (cyberos.cyberware.name, self._ap_color_code) if not len(value) else value
+        cyberos.preferences['sta_hostname'] = value
         cyberos.settings.on_save_settings.set()
 
     # Cyberware AP SSID e.g., "BUTTON-02AD9A-YYG".
@@ -289,18 +300,25 @@ class Network:
     # Tasks
     #
     async def connect(self, ssid=None, key=None):
-        if ssid is None and self._sta_ssid is not None:
-            print('CYBEROS > Reconnecting to', self._sta_ssid)
-            self._sta_if.connect()
-        elif ssid is not None and key is not None:
+        if ssid is not None and len(ssid):
             print('CYBEROS > Connecting to', ssid)
             self._sta_if.connect(ssid, key)
         else:
+            print('CYBEROS > CONNECTION TO AP FAILED')
             return
 
-        # Fix this because this can take forever?
+        _wlan_status = self._sta_if.status()
         while not self._sta_if.isconnected():
-            # Use self._sta_if.status()
+            _wlan_status = self._sta_if.status()
+            if _wlan_status == 2:
+                print('CYBEROS > WRONG PASSWORD FOR {} AP'.format(ssid))
+                return
+            if _wlan_status == 3:
+                print('CYBEROS > {} AP NOT FOUND'.format(ssid))
+                return
+            if _wlan_status == 4:
+                print('CYBEROS > CONNECTION TO {} AP FAILED'.format(ssid))
+                return
             await asyncio.sleep(0)
         self._on_sta_disconnected.clear()
         self._on_sta_connected.set()
@@ -345,8 +363,9 @@ class Network:
             self._sta_if.active(True)
             while not self._sta_if.active():
                 await asyncio.sleep(0)
-            self._sta_if.config(auto_connect=cyberos.preferences['sta_reconnect'],
-                                reconnects=cyberos.preferences['sta_reconnects'],
+            self._sta_if.config(hostname=self._sta_hostname,
+                                auto_connect=self._sta_reconnect,
+                                reconnects=self._sta_reconnects,
                                 pm=network.WLAN.PM_PERFORMANCE)
             self._on_sta_up.clear()
             self._on_sta_active.set()
