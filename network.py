@@ -10,6 +10,7 @@
 #  1. Cyberware channel management 'on_ch_change', 'ch_update' etc.
 #  2. As "ap_name" used to config the AP, make sure user chosen name is valid to use (length, special characters, etc).
 #  3. If "ap_name" changes, update cyberos.cyberwares dictionary and inform paired cyberwares.
+#  4. Implement WLAN.status() monitoring.
 
 import uasyncio as asyncio
 from uasyncio import Event
@@ -28,7 +29,7 @@ class Network:
         self._sta_key = cyberos.preferences['sta_key']
         self._sta_reconnect = cyberos.preferences['sta_reconnect']
         self._sta_reconnects = cyberos.preferences['sta_reconnects']
-        self._sta_ch = cyberos.preferences['sta_channel']
+        self._sta_ch = cyberos.preferences['sta_ch']
         self._sta_hostname = cyberos.preferences['sta_hostname']
 
         self._ap_boot = cyberos.preferences['ap_boot']
@@ -36,10 +37,10 @@ class Network:
         self._ap_key = cyberos.preferences['ap_key']
         self._ap_color = cyberos.preferences['ap_color']
         self._ap_color_code = cyberos.preferences['ap_color_code']
-        self._ap_ch = cyberos.preferences['ap_channel']
+        self._ap_ch = cyberos.preferences['ap_ch']
 
-        self._ch_reset = cyberos.preferences['channel_reset']
-        self._ch_update = cyberos.preferences['channel_update']
+        self._ch_reset = cyberos.preferences['ch_reset']
+        self._ch_update = cyberos.preferences['ch_update']
 
         self._on_sta_up = Event()
         self._on_sta_down = Event()
@@ -85,13 +86,7 @@ class Network:
         asyncio.create_task(_event_ap_pixel())
 
         # Events.
-        cyberos.cyberwares[self._ap_ssid] = (
-            {
-                'events':
-                    {
-                        'on_ch_change': self._on_ch_change,
-                    }
-            })
+        asyncio.create_task(self._push())
 
     ################################################################################
     # Properties
@@ -147,7 +142,7 @@ class Network:
     @sta_hostname.setter
     def sta_hostname(self, value):
         self._sta_hostname = '%s-%s' % (cyberos.cyberware.name, self._ap_color_code) if not len(value) else value
-        cyberos.preferences['sta_hostname'] = value
+        cyberos.preferences['sta_hostname'] = self._sta_hostname
         cyberos.settings.on_save_settings.set()
 
     # Cyberware AP SSID e.g., "BUTTON-02AD9A-YYG".
@@ -158,7 +153,7 @@ class Network:
     @ap_ssid.setter
     def ap_ssid(self, value):
         self._ap_ssid = '%s-%s' % (cyberos.cyberware.name, self._ap_color_code) if not len(value) else value
-        cyberos.preferences['ap_ssid'] = value
+        cyberos.preferences['ap_ssid'] = self._ap_ssid
         cyberos.settings.on_save_settings.set()
 
     # Cyberware AP password.
@@ -213,7 +208,7 @@ class Network:
     @sta_ch.setter
     def sta_ch(self, value):
         self._sta_ch = value
-        cyberos.preferences['sta_channel'] = value
+        cyberos.preferences['sta_ch'] = value
         cyberos.settings.on_save_settings.set()
 
     # Cyberware AP channel.
@@ -224,7 +219,7 @@ class Network:
     @ap_ch.setter
     def ap_ch(self, value):
         self._ap_ch = value
-        cyberos.preferences['ap_channel'] = value
+        cyberos.preferences['ap_ch'] = value
         cyberos.settings.on_save_settings.set()
 
     # Reset Cyberware AP channel once STA is disconnected from Wi-Fi AP.
@@ -235,7 +230,7 @@ class Network:
     @ch_reset.setter
     def ch_reset(self, value):
         self._ch_reset = value
-        cyberos.preferences['channel_reset'] = value
+        cyberos.preferences['ch_reset'] = value
         cyberos.settings.on_save_settings.set()
 
     # Update Cyberware AP channel automatically once requested.
@@ -246,7 +241,7 @@ class Network:
     @ch_update.setter
     def ch_update(self, value):
         self._ch_update = value
-        cyberos.preferences['channel_update'] = value
+        cyberos.preferences['ch_update'] = value
         cyberos.settings.on_save_settings.set()
 
     ################################################################################
@@ -335,7 +330,7 @@ class Network:
             self.sta_key = key
 
         self._sta_ch = self._sta_if.config('channel')
-        if self._sta_ch != cyberos.preferences['sta_channel']:
+        if self._sta_ch != cyberos.preferences['sta_ch']:
             self.sta_ch = self._sta_ch
         print('CYBEROS > Connected to {} on channel {}'.format(self._sta_ssid, self._sta_ch))
 
@@ -348,7 +343,7 @@ class Network:
 
         self._sta_if.config(pm=network.WLAN.PM_PERFORMANCE)
 
-        if self._ch_reset:
+        if self._ch_reset and not cyberos.pairing.on_pair.is_set():
             if self._on_ap_active.is_set():
                 self._on_ap_up.set()
             else:
@@ -364,8 +359,8 @@ class Network:
             while not self._sta_if.active():
                 await asyncio.sleep(0)
             self._sta_if.config(hostname=self._sta_hostname,
-                                auto_connect=self._sta_reconnect,
-                                reconnects=self._sta_reconnects,
+                                auto_connect=False,
+                                reconnects=0,
                                 pm=network.WLAN.PM_PERFORMANCE)
             self._on_sta_up.clear()
             self._on_sta_active.set()
@@ -408,3 +403,12 @@ class Network:
 
     async def _event_ch_change(self):
         pass
+
+    async def _push(self):
+        cyberos.cyberwares[self._ap_ssid] = (
+            {
+                'events':
+                    {
+                        'on_ch_change': self._on_ch_change,
+                    }
+            })
