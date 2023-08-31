@@ -47,7 +47,8 @@ async def _event_ap_pixel():
         for color in [cyberos.network.ap_color[0], cyberos.network.ap_color[1], cyberos.network.ap_color[2]]:
             await cyberos.cyberware.pixel.set_color(color=color)
             await asyncio.sleep_ms(500)
-        await cyberos.cyberware.pixel.set_color(color=cyberos.cyberware.pixel.C_BLANK)
+            await cyberos.cyberware.pixel.set_color(color=cyberos.cyberware.pixel.C_BLANK)
+            await asyncio.sleep_ms(500)
         await asyncio.sleep_ms(1000)
         if not cyberos.network.on_ap_pixel.is_set():
             await cyberos.cyberware.pixel.set_color(color=cyberos.cyberware.pixel.C_GREEN)
