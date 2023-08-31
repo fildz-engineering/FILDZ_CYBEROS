@@ -24,10 +24,10 @@ async def init():
 
     # Various user preferences stored in a dictionary.
     global preferences
-    preferences = dict(ap_boot=False, ap_ssid=None, ap_key='inovator', ap_color=None, ap_color_code=None, ap_channel=13,
-                       sta_boot=True, sta_reconnect=False, sta_reconnects=-1, sta_channel=13, sta_hostname=None,
+    preferences = dict(ap_boot=False, ap_ssid=None, ap_key='inovator', ap_color=None, ap_color_code=None, ap_ch=13,
+                       sta_boot=True, sta_reconnect=False, sta_reconnects=-1, sta_ch=13, sta_hostname=None,
                        sta_ssid=None, sta_key=None,
-                       channel_update=False, channel_reset=True,)
+                       ch_update=False, ch_reset=True,)
 
     global settings
     settings = settings()
