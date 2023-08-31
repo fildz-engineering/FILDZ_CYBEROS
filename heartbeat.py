@@ -23,11 +23,8 @@ class Heartbeat:
         asyncio.create_task(self._event_ping())
         asyncio.create_task(self._event_pong())
 
-        cyberos.cyberwares[cyberos.network.ap_ssid]['events'].update(
-            {
-                'on_ping': self._on_ping,
-                'on_pong': self._on_pong
-            })
+        # Events.
+        asyncio.create_task(self._push())
 
     ################################################################################
     # Events
@@ -56,3 +53,10 @@ class Heartbeat:
             await self._on_pong.wait()
             self._on_pong.clear()
             # print('Pong from', cyberos.event.sender)
+
+    async def _push(self):
+        cyberos.cyberwares[cyberos.network.ap_ssid]['events'].update(
+            {
+                'on_ping': self._on_ping,
+                'on_pong': self._on_pong
+            })
