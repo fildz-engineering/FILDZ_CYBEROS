@@ -26,10 +26,8 @@ class Pairing:
         asyncio.create_task(self._event_pairing())
         asyncio.create_task(self._event_pairing_mode())
 
-        cyberos.cyberwares[cyberos.network.ap_ssid]['events'].update(
-            {
-                'on_pairing': self._on_pairing,
-            })
+        # Events.
+        asyncio.create_task(self._push())
 
     ################################################################################
     # Events
@@ -64,22 +62,23 @@ class Pairing:
                 await asyncio.wait_for(cyberos.cyberware.power_button.on_up.wait(), 3)
             except asyncio.TimeoutError:
                 print('CYBEROS > Pairing mode started')
-                if cyberos.network.on_sta_connected.is_set():
-                    _sta_reconnect = True
-                    await cyberos.network.disconnect()
-                else:
-                    _sta_reconnect = False
-                if cyberos.network.on_ap_active.is_set():
-                    _ap_disable = False
-                else:
-                    _ap_disable = True
-                    cyberos.network.on_ap_up.set()
                 self._on_pair.set()
+
+                _sta_reconnect = True if cyberos.network.on_sta_connected.is_set() else False
+                _ap_disable = False if cyberos.network.on_ap_active.is_set() else True
+
+                if _sta_reconnect:
+                    await cyberos.network.disconnect()
+                    cyberos.network.on_ap_up.set()
+                elif _ap_disable:
+                    cyberos.network.on_ap_up.set()
+
+                await asyncio.sleep(0)  # Wait for all the events to complete.
                 await asyncio.sleep(3)
                 self._on_pair.clear()
                 print('CYBEROS > Pairing mode timeout')
                 if _sta_reconnect:
-                    await cyberos.network.connect()
+                    await cyberos.network.connect(cyberos.network.sta_ssid, cyberos.network.sta_key)
                 if _ap_disable:
                     cyberos.network.on_ap_down.set()
                 if cyberos.cyberware.power_button.on_hold.is_set():
@@ -89,13 +88,14 @@ class Pairing:
     async def _event_pair(self):
         while True:
             await self._on_pair.wait()
+            await cyberos.network.on_ap_active.wait()
             event = await cyberos.event.encode('on_pairing',
                                                (cyberos.cyberware.mac_private,
                                                 cyberos.network.ap_ch.to_bytes(1, 'little')))
             # Send pairing request every second.
-            while self._on_pair.is_set():
+            while self._on_pair.is_set() and cyberos.network.on_ap_active.is_set():
                 print('CYBEROS > Pairing mode')
-                await cyberos.espnow.asend(cyberos.cyberware.mac_public, event, sync=True)
+                await cyberos.espnow.asend(cyberos.cyberware.mac_public, event, sync=False)
                 await cyberos.cyberware.buzzer.play(4)
                 await asyncio.sleep(1)
 
@@ -115,12 +115,12 @@ class Pairing:
                         cyberos.cyberwares['subscribed'][cyberos.event.sender].update({
                             'mac': cyberos.event.args[0],
                             'mac_str': ubinascii.hexlify(cyberos.event.args[0], ':').decode().upper(),
-                            'channel': int.from_bytes(cyberos.event.args[1], 'little')})
+                            'ch': int.from_bytes(cyberos.event.args[1], 'little')})
                 else:
                     cyberos.cyberwares['subscribed'][cyberos.event.sender] = {
                         'mac': cyberos.event.args[0],
                         'mac_str': ubinascii.hexlify(cyberos.event.args[0], ':').decode().upper(),
-                        'channel': int.from_bytes(cyberos.event.args[1], 'little'),
+                        'ch': int.from_bytes(cyberos.event.args[1], 'little'),
                         'events': {}}
                 print('CYBEROS > Paired with', cyberos.event.sender)
                 self._on_paired.set()
@@ -130,3 +130,9 @@ class Pairing:
                 await cyberos.cyberware.buzzer.play(2)
             else:
                 self._on_pairing.clear()
+
+    async def _push(self):
+        cyberos.cyberwares[cyberos.network.ap_ssid]['events'].update(
+            {
+                'on_pairing': self._on_pairing,
+            })
