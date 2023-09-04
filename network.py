@@ -62,7 +62,7 @@ class Network:
             asyncio.create_task(_ap_color_code_update())
 
         if self._sta_hostname is None:
-            self.sta_hostname = cyberos.cyberware.name
+            self.sta_hostname = ''  # Reset the hostname to default value.
 
         if self._sta_boot:
             self._on_sta_up.set()
@@ -141,7 +141,7 @@ class Network:
 
     @sta_hostname.setter
     def sta_hostname(self, value):
-        self._sta_hostname = '%s-%s' % (cyberos.cyberware.name, self._ap_color_code) if not len(value) else value
+        self._sta_hostname = '%s-%s' % ('FCW', cyberos.cyberware.id.decode()) if not len(value) else value
         cyberos.preferences['sta_hostname'] = self._sta_hostname
         cyberos.settings.on_save_settings.set()
 
@@ -305,13 +305,13 @@ class Network:
         _wlan_status = self._sta_if.status()
         while not self._sta_if.isconnected():
             _wlan_status = self._sta_if.status()
-            if _wlan_status == 2:
+            if _wlan_status == network.STAT_WRONG_PASSWORD:
                 print('CYBEROS > WRONG PASSWORD FOR {} AP'.format(ssid))
                 return
-            if _wlan_status == 3:
+            if _wlan_status == network.STAT_NO_AP_FOUND:
                 print('CYBEROS > {} AP NOT FOUND'.format(ssid))
                 return
-            if _wlan_status == 4:
+            if _wlan_status == network.STAT_CONNECT_FAIL:
                 print('CYBEROS > CONNECTION TO {} AP FAILED'.format(ssid))
                 return
             await asyncio.sleep(0)
