@@ -222,7 +222,7 @@ class HTTPServer:
     async def start(self):
         if self.instance is None:
             await asyncio.create_task(self._run())
-            from fildz_console import api
+            # import fildz_console
             print('CYBEROS > HTTP server started')
 
     async def stop(self):
