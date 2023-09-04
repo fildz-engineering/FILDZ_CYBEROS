@@ -1,3 +1,11 @@
+# The MIT License (MIT)
+# Copyright (c) 2023 Edgaras Janušauskas and Inovatorius MB (www.fildz.com)
+
+################################################################################
+# FILDZ CYBEROS NETWORK UTILITIES
+#
+# Variety of generators that depend on WLAN.
+
 import fildz_cyberos as cyberos
 import uasyncio as asyncio
 
