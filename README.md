@@ -18,8 +18,7 @@ CYBEROS was developed for [CYBERCORE X1](https://www.indiegogo.com/projects/cybe
 ## Setup
 
 1. Download and extract .zip file contents to "fildz_cyberos" folder.
-2. "fildz_cyberos" folder should contain only `__init__.py`, `settings.py`, `network.py`, `listener.py`, `pairing.py` and `heartbeat.py` files.
-3. Upload "fildz_cyberos" folder to your MicroPython powered device.
+2. Upload "fildz_cyberos" folder to your MicroPython powered device.
 
 ## Requirements
 
