@@ -17,15 +17,15 @@ CYBEROS was developed for [CYBERCORE X1](https://www.indiegogo.com/projects/cybe
 
 ## Setup
 
-1. Download and extract .zip file contents to "fildz_cyberos" folder.
-2. Upload "fildz_cyberos" folder to your MicroPython powered device.
+1. Download and extract .zip file contents to fildz_cyberos folder.
+2. Upload fildz_cyberos folder to your MicroPython powered device.
 
 ## Requirements
 
 1. FILDZ custom build of [MicroPython](https://github.com/fildz-official/micropython/tree/cyberware).
 2. [CYBERWARE API](https://github.com/fildz-official/FILDZ_CYBERWARE).
 3. Libraries [fildz_button](https://github.com/fildz-official/FILDZ_CYBEROS_Button), [fildz_buzzer](https://github.com/fildz-official/FILDZ_CYBEROS_Buzzer) and [fildz_neopixel](https://github.com/fildz-official/FILDZ_CYBEROS_NeoPixel).
-4. (Optional) APIs [fildz_button_api](https://github.com/fildz-official).
+4. (Optional) APIs [fildz_button_api](https://github.com/fildz-official/FILDZ_CYBEROS_Button_API).
 
 ## Usage
 
