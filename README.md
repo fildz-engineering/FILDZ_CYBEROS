@@ -64,7 +64,7 @@ asyncio.run(main())
 
 ## Documentation
 
-The documentation for this library is currently a work in progress. It will be available soon to provide detailed explanations of the library's API, usage examples, and best practices.
+[CYBEROS WIKI](https://github.com/fildz-official/FILDZ_CYBEROS/wiki)
 
 ## Contributing
 
