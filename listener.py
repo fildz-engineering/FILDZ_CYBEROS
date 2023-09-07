@@ -166,6 +166,9 @@ class Listener:
 
         # Event args.
         while True:
+            if offset >= size:
+                yield args
+                break
             arg_size = event[offset:offset + 1][0]
             arg = event[offset + 1:offset + 1 + arg_size]
             try:
@@ -174,9 +177,6 @@ class Listener:
                 arg = bytes(arg)
             args.append(arg)
             offset += 1 + len(arg)
-            if offset >= size:
-                yield args
-                break
 
     async def send(self, event_name, *args, cyberware='', sync=True):
         if cyberware is '':
