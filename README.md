@@ -11,7 +11,7 @@ CYBEROS was developed for [CYBERCORE X1](https://www.indiegogo.com/projects/cybe
 * Paired ESP devices are saved in `fildz/cyberwares.json`.
 * Events are send and received via ESP-NOW.
 * Listen for the events from all or specific ESP devices.
-* APIs allow to extend the events ESP can subscribe to (see [fildz_button](https://github.com/fildz-official/FILDZ_CYBEROS_Button) and [fildz_button_api](https://github.com/fildz-official/FILDZ_CYBEROS_Button_API)).
+* APIs allow to extend the events ESP can subscribe to (see [fildz_button](https://github.com/fildz-engineering/FILDZ_CYBEROS_Button) and [fildz_button_api](https://github.com/fildz-engineering/FILDZ_CYBEROS_Button_API)).
 * Network and power features management.
 * User preferences are saved in `fildz/cyberos.json`.
 
@@ -22,10 +22,10 @@ CYBEROS was developed for [CYBERCORE X1](https://www.indiegogo.com/projects/cybe
 
 ## Requirements
 
-1. FILDZ custom build of [MicroPython](https://github.com/fildz-official/micropython/tree/cyberware).
-2. [CYBERWARE API](https://github.com/fildz-official/FILDZ_CYBERWARE).
-3. Libraries [fildz_button](https://github.com/fildz-official/FILDZ_CYBEROS_Button), [fildz_buzzer](https://github.com/fildz-official/FILDZ_CYBEROS_Buzzer) and [fildz_neopixel](https://github.com/fildz-official/FILDZ_CYBEROS_NeoPixel).
-4. (Optional) APIs [fildz_button_api](https://github.com/fildz-official/FILDZ_CYBEROS_Button_API).
+1. FILDZ custom build of [MicroPython](https://github.com/fildz-engineering/FILDZ_CYBEROS_FIRMWARE).
+2. [CYBERWARE API](https://github.com/fildz-engineering/FILDZ_CYBERWARE).
+3. Libraries [fildz_button](https://github.com/fildz-engineering/FILDZ_CYBEROS_Button), [fildz_buzzer](https://github.com/fildz-engineering/FILDZ_CYBEROS_Buzzer) and [fildz_neopixel](https://github.com/fildz-engineering/FILDZ_CYBEROS_NeoPixel).
+4. (Optional) APIs [fildz_button_api](https://github.com/fildz-engineering/FILDZ_CYBEROS_Button_API).
 
 ## Usage
 
@@ -64,7 +64,7 @@ asyncio.run(main())
 
 ## Documentation
 
-[CYBEROS WIKI](https://github.com/fildz-official/FILDZ_CYBEROS/wiki)
+[CYBEROS WIKI](https://github.com/fildz-engineering/FILDZ_CYBEROS/wiki)
 
 ## Contributing
 
